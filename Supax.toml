@@ -1,0 +1,12 @@
+[package]
+name = "supax"
+version = "0.1.0-dev"
+description = "مدير حزم السلطان ونظام بنائه"
+license = "MIT"
+
+[package.names]
+en = "supax"
+ar = "سوباكس"
+
+[lib]
+path = "src"

@@ -1,0 +1,8 @@
+# اختبارات وحدات سوباكس: حزمة تعتمد على سوباكس نفسه.
+# Supax unit tests: a package that depends on Supax itself.
+[package]
+name = "supax_unit"
+version = "0.0.0"
+
+[dependencies]
+supax = { path = "../.." }

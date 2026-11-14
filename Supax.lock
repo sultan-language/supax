@@ -1,0 +1,7 @@
+# يكتب سوباكس هذا الملف تلقائيا؛ لا تعدّله يدويا. Written by Supax; do not edit by hand.
+version = 1
+
+[[package]]
+name = "supax"
+version = "0.1.0-dev"
+source = "root"

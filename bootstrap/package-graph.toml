@@ -1,0 +1,9 @@
+# مخطط الحزم لـ sultanc --package-graph؛ يكتبه سوباكس. Package graph for sultanc --package-graph, written by Supax.
+version = 1
+root = "supax"
+
+[[package]]
+id = "supax"
+source_root = "../src"
+name = "supax"
+spellings = { en = "supax", ar = "سوباكس" }

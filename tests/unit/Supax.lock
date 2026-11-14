@@ -1,0 +1,14 @@
+# يكتب سوباكس هذا الملف تلقائيا؛ لا تعدّله يدويا. Written by Supax; do not edit by hand.
+version = 1
+
+[[package]]
+name = "supax_unit"
+version = "0.0.0"
+source = "root"
+dependencies = ["supax"]
+
+[[package]]
+name = "supax"
+version = "0.1.0-dev"
+source = "path"
+path = "../.."
