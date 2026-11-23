@@ -1,30 +1,30 @@
 // نص المساعدة والإصدار.
-استورد المكتبة.مجموعات.sort;
-استورد المكتبة.مجموعات.vector;
-استورد المكتبة.تشفير.sha256;
-استورد المكتبة.بيئة.environment;
-استورد المكتبة.بيئة.variables;
-استورد المكتبة.عمليات.arguments;
-استورد المكتبة.عمليات.child;
-استورد المكتبة.عمليات.command;
-استورد المكتبة.عمليات.exit;
-استورد المكتبة.تومل.parser;
-استورد المكتبة.ترميز.hex;
-استورد المكتبة.دخ.println;
-استورد المكتبة.ملفات.canonical;
-استورد المكتبة.ملفات.directory;
-استورد المكتبة.ملفات.mutation;
-استورد المكتبة.ملفات.path;
-استورد المكتبة.ملفات.permissions;
-استورد المكتبة.ملفات.read_file;
-استورد المكتبة.ملفات.temporary;
-استورد المكتبة.ملفات.walk;
-استورد المكتبة.ملفات.write_file;
-استورد المكتبة.نصوص.compare;
-استورد المكتبة.نصوص.from_bytes;
-استورد المكتبة.نصوص.number;
-استورد المكتبة.نصوص.search;
-استورد المكتبة.نصوص.transform;
+استورد المكتبة.مجموعات.ترتيب;
+استورد المكتبة.مجموعات.متجهات;
+استورد المكتبة.تشفير.شا256;
+استورد المكتبة.بيئة.بيئة_العمل;
+استورد المكتبة.بيئة.متغيرات;
+استورد المكتبة.عمليات.الوسائط;
+استورد المكتبة.عمليات.عملية_ابن;
+استورد المكتبة.عمليات.أمر;
+استورد المكتبة.عمليات.اخرج;
+استورد المكتبة.تومل.محلل;
+استورد المكتبة.ترميز.سداسي;
+استورد المكتبة.دخ.اطبع_سطر;
+استورد المكتبة.ملفات.مسار_قانوني;
+استورد المكتبة.ملفات.مجلد;
+استورد المكتبة.ملفات.تعديل;
+استورد المكتبة.ملفات.مسار;
+استورد المكتبة.ملفات.أذونات;
+استورد المكتبة.ملفات.قراءة_ملف;
+استورد المكتبة.ملفات.مؤقت;
+استورد المكتبة.ملفات.اجتياز;
+استورد المكتبة.ملفات.كتابة_ملف;
+استورد المكتبة.نصوص.مقارنة;
+استورد المكتبة.نصوص.من_بايتات;
+استورد المكتبة.نصوص.أعداد;
+استورد المكتبة.نصوص.بحث;
+استورد المكتبة.نصوص.تحويل;
 استورد سوباكس.support.text;
 استورد سوباكس.support.messages;
 
@@ -35,10 +35,10 @@
         رسالة(«سوباكس — مدير حزم السلطان», «Supax — the SultanC package manager»), سطر_جديد(), سطر_جديد(),
         رسالة(«الاستخدام: supax <الأمر> [الخيارات]», «Usage: supax <command> [options]»), سطر_جديد(), سطر_جديد(),
         رسالة(«الأوامر:», «Commands:»), سطر_جديد(),
-        رسالة(«  new     | جديد    ينشئ حزمة جديدة في دليل جديد», «  new     | جديد    create a new package in a new directory»), سطر_جديد(),
-        رسالة(«  init    | هيئ     ينشئ حزمة في الدليل الحالي», «  init    | هيئ     create a package in the current directory»), سطر_جديد(),
-        رسالة(«  add     | أضف     يضيف اعتمادية: supax add <الاسم>[@<إصدار>] | <الاسم> --path <مسار> | --git <رابط> [--tag <وسم>]», «  add     | أضف     add a dependency: supax add <name>[@<version>] | <name> --path <path> | --git <url> [--tag <tag>]»), سطر_جديد(),
-        رسالة(«  remove  | احذف    يحذف اعتمادية: supax remove <الاسم>», «  remove  | احذف    remove a dependency: supax remove <name>»), سطر_جديد(),
+        رسالة(«  new     | جديد    ينشئ حزمة جديدة في دليل جديد (--lib: مكتبة)», «  new     | جديد    create a new package in a new directory (--lib: a library)»), سطر_جديد(),
+        رسالة(«  init    | هيئ     ينشئ حزمة في الدليل الحالي (--lib: مكتبة)», «  init    | هيئ     create a package in the current directory (--lib: a library)»), سطر_جديد(),
+        رسالة(«  add     | أضف     يضيف اعتمادية: supax add <الاسم>[@<إصدار>] | <الاسم> --path <مسار> | --git <رابط> [--tag <وسم>] [--dev]», «  add     | أضف     add a dependency: supax add <name>[@<version>] | <name> --path <path> | --git <url> [--tag <tag>] [--dev]»), سطر_جديد(),
+        رسالة(«  remove  | احذف    يحذف اعتمادية: supax remove <الاسم> [--dev]», «  remove  | احذف    remove a dependency: supax remove <name> [--dev]»), سطر_جديد(),
         رسالة(«  fetch   | جلب     يحل الاعتماديات ويجلبها ويكتب Supax.lock», «  fetch   | جلب     resolve and fetch dependencies, write Supax.lock»), سطر_جديد(),
         رسالة(«  update  | حدث     يعيد حل الاعتماديات متجاهلا التثبيتات (كلها أو المسماة)», «  update  | حدث     re-resolve, ignoring pins (all, or the named ones)»), سطر_جديد(),
         رسالة(«  tree    | شجرة    يعرض مخطط الاعتماديات», «  tree    | شجرة    show the dependency graph»), سطر_جديد(),
@@ -47,13 +47,19 @@
         رسالة(«  check   | افحص    يفحص المشروع بالمترجم», «  check   | افحص    check the project with the compiler»), سطر_جديد(),
         رسالة(«  build   | ابن     يبني المشروع بالمترجم», «  build   | ابن     build the project with the compiler»), سطر_جديد(),
         رسالة(«  run     | شغل     يبني المشروع ثم يشغله (الوسائط بعد -- تمر للبرنامج)», «  run     | شغل     build the project, then run it (arguments after -- go to the program)»), سطر_جديد(),
+        رسالة(«  fmt     | نسق     ينسّق مصادر الحزمة بـ sultanc fmt (src/ و tests/)؛ --check يبلّغ دون تغيير», «  fmt     | نسق     format the package's sources with sultanc fmt (src/ and tests/); --check reports, changes nothing»), سطر_جديد(),
+        رسالة(«  install | ثبت     يبني برامج حزمة (--release) ويثبتها في ~/.supax/bin: <الاسم>[@<متطلب>] | --path <دليل> | --git <رابط> [<الاسم>]؛ --list يعرض المثبت؛ --force يستبدل», «  install | ثبت     build a package's programs (--release) into ~/.supax/bin: <name>[@<req>] | --path <dir> | --git <url> [<name>]; --list shows them; --force replaces»), سطر_جديد(),
+        رسالة(«  uninstall | أزل   يحذف برامج حزمة مثبتة: supax uninstall <الحزمة> [--bin <الاسم>]», «  uninstall | أزل   remove an installed package's programs: supax uninstall <package> [--bin <name>]»), سطر_جديد(),
         رسالة(«  clean   | نظف     يحذف الدليل build/», «  clean   | نظف     remove the build/ directory»), سطر_جديد(),
         رسالة(«  cache   | مخبأ    info: حجم مخبأ git ومكانه؛ clean: يحذفه (يُجلب من جديد عند الحاجة)», «  cache   | مخبأ    info: where the git cache is and its size; clean: remove it (refetched when needed)»), سطر_جديد(),
         رسالة(«  test    | اختبر   يشغّل الاختبارات (@@اختبار): supax test [نص] [--lib | --bin <الاسم> | --test <الاسم>] [--list] [--no-fail-fast]», «  test    | اختبر   run the tests (@@test): supax test [text] [--lib | --bin <name> | --test <name>] [--list] [--no-fail-fast]»), سطر_جديد(),
         رسالة(«  package | حزّم    يجهز إصدار الحزمة (HEAD) ويطبع مدخله لفهرس الحزم», «  package | حزّم    check this release (HEAD) and print its entry for the package index»), سطر_جديد(),
+        رسالة(«  publish | انشر    يفحص الإصدار ويشرح نشره يدويا في الفهرس (حتى يتوفر موقع السجل)», «  publish | انشر    check this release and explain how to publish it to the index by hand (until the registry website is ready)»), سطر_جديد(),
+        رسالة(«  yank    | اسحب    يسحب إصدارا في نسخة محلية من الفهرس: supax yank [<الاسم>@]<الإصدار> [--undo] [--index <دليل>]», «  yank    | اسحب    yank a version in a local clone of the index: supax yank [<name>@]<version> [--undo] [--index <dir>]»), سطر_جديد(),
         رسالة(«  migrate | رحّل    ينقل [imports-alias] إلى أسطر «وحدة» في ملفات الجذر», «  migrate | رحّل    move [imports-alias] into module lines in the root files»), سطر_جديد(),
         رسالة(«  build/run --bin <الاسم>  يختار برنامجا من src/bin/<الاسم>.sn», «  build/run --bin <name>  pick one program from src/bin/<name>.sn»), سطر_جديد(), سطر_جديد(),
         رسالة(«الخيارات:», «Options:»), سطر_جديد(),
+        رسالة(«  --dev      مع add و remove: الجدول [dev-dependencies] (للاختبارات وحدها)», «  --dev      with add and remove: the [dev-dependencies] table (for tests only)»), سطر_جديد(),
         رسالة(«  --locked   يفشل إن احتاج Supax.lock إلى تغيير», «  --locked   fail if Supax.lock would change»), سطر_جديد(),
         رسالة(«  --offline  لا يستخدم الشبكة؛ يكفي ما في المخبأ», «  --offline  never use the network; use only the cache»), سطر_جديد(),
         رسالة(«  --frozen   --locked و --offline معا», «  --frozen   --locked and --offline together»), سطر_جديد(),
@@ -61,6 +67,8 @@
         رسالة(«  --target <هدف>, -t  منصة الهدف؛ المخرج في build/bin/<هدف>/ (القائمة: sultanc targets)», «  --target <target>, -t  target platform; output in build/bin/<target>/ (list: sultanc targets)»), سطر_جديد(),
         رسالة(«  --package <الاسم>, -p  عضو واحد من مساحة العمل ([workspace] members)», «  --package <name>, -p  one member of the workspace ([workspace] members)»), سطر_جديد(),
         رسالة(«  --quiet, -q  بلا أسطر حالة», «  --quiet, -q  no status lines»), سطر_جديد(),
+        رسالة(«  --message-format=human|short|json  صيغة تشخيصات المترجم؛ json يكتم أسطر الحالة», «  --message-format=human|short|json  compiler diagnostic format; json turns off status lines»), سطر_جديد(),
+        رسالة(«  --color=auto|always|never  تلوين تشخيصات المترجم», «  --color=auto|always|never  color in compiler diagnostics»), سطر_جديد(),
         رسالة(«  --lang=ar|en  لغة الرسائل (الافتراضية العربية)», «  --lang=ar|en  message language (default Arabic)»), سطر_جديد(), سطر_جديد(),
         رسالة(«البيئة:», «Environment:»), سطر_جديد(),
         رسالة(«  SUPAX_HOME  بيت سوباكس: الأدوات والمخبأ (الافتراضي ~/.supax)», «  SUPAX_HOME  Supax home: tools and cache (default ~/.supax)»), سطر_جديد(),

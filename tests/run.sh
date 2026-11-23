@@ -573,6 +573,48 @@ expect_fail "package refuses path dependencies" "path dependency" \
 expect_fail "an index in a newer format asks to update Supax" "update Supax" \
     bash -c "cd '$WORK/regapp' && rm -f Supax.lock && SUPAX_LANG=en '$SX' fetch"
 (cd "$IDX" && printf 'version = 1\n' > config.toml && git_q commit -qam v1)
+# supax publish: checks the release like package, uploads nothing, and explains the manual steps.
+out="$(cd "$WORK/regrepos/pkgx" && SUPAX_LANG=en "$SX" publish --git "file://$WORK/regrepos/pkgx" 2>&1)"; code=$?
+[[ $code == 0 && "$out" == *"Nothing was uploaded"* && "$out" == *"packages/pk/gx/pkgx.toml"* && "$out" == *'version = "0.1.0"'* && "$out" == *"pull request"* ]] \
+    && ok "publish checks the release and explains how to publish it by hand" || bad "publish ($code)" "$out"
+expect_fail "publish refuses what package refuses" "uncommitted changes" \
+    bash -c "cd '$WORK/regrepos/pkgx' && echo '// x' >> src/lib.sn && SUPAX_LANG=en '$SX' publish --git x; r=\$?; git checkout -q src/lib.sn; exit \$r"
+# supax yank in a clone of the index: fresh locks skip the version, --undo brings it back.
+YI="$WORK/yankidx"; rm -rf "$YI"; git clone -q "$IDX" "$YI"
+cp "$YI/packages/ma/th/mathx.toml" "$WORK/mathx.orig"
+out="$(cd "$YI" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" yank mathx@1.7.0 2>&1)"
+grep -A5 'version = "1.7.0"' "$YI/packages/ma/th/mathx.toml" | grep -q '^yanked = true' && [[ "$out" == *"Yank mathx@1.7.0"* ]] \
+    && ok "yank adds yanked = true to that version in the index clone" || bad "yank" "$out$(cat "$YI/packages/ma/th/mathx.toml")"
+(cd "$YI" && git_q commit -qam "yank 1.7.0")
+# 1.7.0, the newest 1.x, has a bad checksum on purpose: picking it fails, so 16 means it was skipped.
+r="$(SUPAX_INDEX="file://$YI" regrun '"1"')"; [[ "$r" == 16 ]] && ok "a fresh lock skips the yanked version" || bad "yank resolve" "exit $r: $(cat "$WORK/regapp/Supax.lock" 2>&1 | grep -E '^(version|registry)')"
+out="$(SUPAX_LANG=en "$SX" yank mathx@1.7.0 --index "$YI" 2>&1)"
+[[ "$out" == *"already yanked"* ]] && ok "yanking twice says it is already yanked" || bad "yank twice" "$out"
+(cd "$YI" && "$SX" yank mathx@1.7.0 --undo >/dev/null 2>&1)
+cmp -s "$WORK/mathx.orig" "$YI/packages/ma/th/mathx.toml" && ok "yank --undo restores the file exactly" || bad "yank undo" "$(diff "$WORK/mathx.orig" "$YI/packages/ma/th/mathx.toml")"
+(cd "$YI" && git_q commit -qam "unyank 1.7.0")
+expect_fail "after --undo the version is picked again" 'the content of "mathx" 1.7.0' \
+    bash -c "cd '$WORK/regapp' && rm -f Supax.lock && SUPAX_INDEX='file://$YI' SUPAX_LANG=en '$SX' fetch"
+expect_fail "yank reports a version the index does not have" "there is no version 9.9.9. Versions: 1.0.0, 1.2.0" \
+    bash -c "SUPAX_LANG=en '$SX' yank mathx@9.9.9 --index '$YI'"
+expect_fail "yank outside an index clone says how to get one" "is not a clone of the package index" \
+    bash -c "cd '$WORK' && SUPAX_LANG=en '$SX' yank mathx@1.2.0"
+out="$(cd "$WORK/regrepos/pkgx" && SUPAX_LANG=en "$SX" yank 0.1.0 --index "$YI" 2>&1)"
+[[ "$out" == *'no package named "pkgx"'* ]] && ok "yank <version> inside a package uses that package's name" || bad "yank default name" "$out"
+# supax install <name>[@<requirement>] from the index (a package with [lib] and a program).
+T="$WORK/regrepos/rtool"; mkdir -p "$T/src"
+printf '[package]\nname = "rtool"\nversion = "1.0.0"\n\n[lib]\npath = "src"\n' > "$T/Supax.toml"
+printf 'عام عرف واحد(): عدد { أرجع 1; }\n' > "$T/src/lib.sn"
+printf 'عرف الرئيسية(): عدد { أرجع 7; }\n' > "$T/src/main.sn"
+(cd "$T" && git_q init -q && git_q add -A && git_q commit -qm 1.0.0 && git_q tag v1.0.0)
+mkdir -p "$IDX/packages/rt/oo"
+(cd "$IDX" && { echo 'name = "rtool"'; reg_line rtool 1.0.0; } > packages/rt/oo/rtool.toml && git_q add -A && git_q commit -qm rtool)
+out="$(SUPAX_LANG=en "$SX" install rtool 2>&1)"; code=$?
+"$SUPAX_HOME/bin/rtool"; rc=$?
+[[ $code == 0 && $rc == 7 ]] && grep -q 'source = "registry"' "$SUPAX_HOME/installed.toml" \
+    && ok "install <name> builds an index package and installs its program" || bad "install from index ($code, $rc)" "$out"
+expect_ok "install <name>@<requirement> takes a requirement" bash -c "'$SX' install rtool@1 --force"
+"$SX" uninstall rtool >/dev/null 2>&1
 unset SUPAX_INDEX
 
 # --- supax test (needs sultanc test) ---------------------------------------------------
@@ -581,9 +623,9 @@ if (cd "$WORK/tprobe" && "$SULTANC" test --list p.sn >/dev/null 2>&1); then
     T="$WORK/tlib"; mkdir -p "$T/src" "$T/tests"
     printf '[package]\nname = "tlib"\nversion = "0.1.0"\n\n[lib]\npath = "src"\n' > "$T/Supax.toml"
     printf 'استورد tlib.a;\nاستورد tlib.b;\n' > "$T/src/tlib.sn"
-    printf 'استورد المكتبة.debug.assert;\nعام عرف واحد(): عدد { أرجع 1; }\n@@اختبار\nعرف واحد_صحيح(): فراغ { تأكد(واحد() == 1); }\n' > "$T/src/a.sn"
-    printf 'استورد المكتبة.debug.assert;\nعام عرف اثنان(): عدد { أرجع 2; }\n@@test\nعرف two_is_two(): فراغ { تأكد(اثنان() == 2); }\n' > "$T/src/b.sn"
-    printf 'استورد المكتبة.debug.assert;\nاستورد tlib.b;\n@@test\nعرف from_tests_dir(): فراغ { تأكد(اثنان() == 2); }\n' > "$T/tests/outside.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nعام عرف واحد(): عدد { أرجع 1; }\n@@اختبار\nعرف واحد_صحيح(): فراغ { تأكد(واحد() == 1); }\n' > "$T/src/a.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nعام عرف اثنان(): عدد { أرجع 2; }\n@@test\nعرف two_is_two(): فراغ { تأكد(اثنان() == 2); }\n' > "$T/src/b.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nاستورد tlib.b;\n@@test\nعرف from_tests_dir(): فراغ { تأكد(اثنان() == 2); }\n' > "$T/tests/outside.sn"
     out="$(cd "$T" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
     [[ $code == 0 && "$out" == *"Running lib src/tlib.sn"* && "$out" == *"PASS واحد_صحيح"* && "$out" == *"PASS two_is_two"* \
         && "$out" == *"Running test tests/outside.sn"* && "$out" == *"PASS from_tests_dir"* ]] \
@@ -602,8 +644,8 @@ if (cd "$WORK/tprobe" && "$SULTANC" test --list p.sn >/dev/null 2>&1); then
     [[ "$out" == *"tests/outside.sn"* && "$out" != *"Running lib"* ]] && ok "test --test <name> runs one tests/ file" || bad "test --test" "$out"
     out="$(cd "$T" && "$SX" test --lib --list 2>&1)"
     [[ "$out" == *"واحد_صحيح"* && "$out" == *"two_is_two"* && "$out" != *"PASS"* ]] && ok "test --lib --list lists without running" || bad "test --list" "$out"
-    printf 'استورد المكتبة.debug.assert;\nعام عرف اثنان(): عدد { أرجع 2; }\n@@test\nعرف two_is_three(): فراغ { تأكد(اثنان() == 3); }\n' > "$T/src/b.sn"
-    printf 'استورد المكتبة.debug.assert;\n@@test\nعرف always(): فراغ { تأكد(صواب); }\n' > "$T/tests/outside.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nعام عرف اثنان(): عدد { أرجع 2; }\n@@test\nعرف two_is_three(): فراغ { تأكد(اثنان() == 3); }\n' > "$T/src/b.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\n@@test\nعرف always(): فراغ { تأكد(صواب); }\n' > "$T/tests/outside.sn"
     out="$(cd "$T" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
     [[ $code == 1 && "$out" == *"FAIL two_is_three"* && "$out" == *'to rerun pass "--lib"'* && "$out" != *"tests/outside.sn"* ]] \
         && ok "a failing test stops the run and says how to rerun it" || bad "test failure ($code)" "$out"
@@ -614,8 +656,8 @@ if (cd "$WORK/tprobe" && "$SULTANC" test --list p.sn >/dev/null 2>&1); then
     (cd "$T" && "$SX" test --test broken >/dev/null 2>&1); [[ $? == 2 ]] && ok "tests that do not build give status 2" || bad "test build error"
     P="$WORK/tbin"; mkdir -p "$P/src/bin"
     printf '[package]\nname = "tbin"\n' > "$P/Supax.toml"
-    printf 'استورد المكتبة.debug.assert;\nعرف الرئيسية(): عدد { أرجع 0; }\n@@اختبار\nعرف في_الرئيسي(): فراغ { تأكد(صواب); }\n' > "$P/src/main.sn"
-    printf 'استورد المكتبة.debug.assert;\nعرف الرئيسية(): عدد { أرجع 0; }\n@@test\nعرف in_tool(): فراغ { تأكد(صواب); }\n' > "$P/src/bin/tool.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nعرف الرئيسية(): عدد { أرجع 0; }\n@@اختبار\nعرف في_الرئيسي(): فراغ { تأكد(صواب); }\n' > "$P/src/main.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nعرف الرئيسية(): عدد { أرجع 0; }\n@@test\nعرف in_tool(): فراغ { تأكد(صواب); }\n' > "$P/src/bin/tool.sn"
     out="$(cd "$P" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
     [[ $code == 0 && "$out" == *"Running bin src/main.sn"* && "$out" == *"PASS في_الرئيسي"* && "$out" == *"PASS in_tool"* ]] \
         && ok "test runs the tests of every program" || bad "test programs ($code)" "$out"
@@ -625,8 +667,8 @@ if (cd "$WORK/tprobe" && "$SULTANC" test --list p.sn >/dev/null 2>&1); then
     B="$WORK/tboth"; mkdir -p "$B/src"
     printf '[package]\nname = "both"\n\n[lib]\npath = "src"\n' > "$B/Supax.toml"
     printf 'استورد both.a;\n' > "$B/src/both.sn"
-    printf 'استورد المكتبة.debug.assert;\nعام عرف واحد(): عدد { أرجع 1; }\n@@test\nعرف lib_once(): فراغ { تأكد(واحد() == 1); }\n' > "$B/src/a.sn"
-    printf 'استورد المكتبة.debug.assert;\nاستورد both.a;\nعرف الرئيسية(): عدد { أرجع واحد(); }\n@@test\nعرف main_own(): فراغ { تأكد(صواب); }\n' > "$B/src/main.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nعام عرف واحد(): عدد { أرجع 1; }\n@@test\nعرف lib_once(): فراغ { تأكد(واحد() == 1); }\n' > "$B/src/a.sn"
+    printf 'استورد المكتبة.تصحيح.تأكد;\nاستورد both.a;\nعرف الرئيسية(): عدد { أرجع واحد(); }\n@@test\nعرف main_own(): فراغ { تأكد(صواب); }\n' > "$B/src/main.sn"
     out="$(cd "$B" && SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
     n="$(printf '%s' "$out" | grep -c 'PASS lib_once')"
     probe="$("$SULTANC" test --tests-in 2>&1 || true)"
@@ -649,7 +691,7 @@ printf 'استورد util.lib;\nعرف الرئيسية(): عدد { أرجع ث�
 printf '[package]\nname = "util"\nversion = "0.1.0"\n\n[lib]\npath = "src"\n\n[dependencies]\nmath = { path = "../math" }\n' > "$W/libs/util/Supax.toml"
 printf 'استورد math.lib;\nعام عرف ثلاثة(): عدد { أرجع واحد() + 2; }\n' > "$W/libs/util/src/lib.sn"
 HAS_TEST=0; (cd "$WORK/tprobe" && "$SULTANC" test --list p.sn >/dev/null 2>&1) && HAS_TEST=1
-[[ $HAS_TEST == 1 ]] && printf 'استورد math.lib;\nاستورد المكتبة.debug.assert;\nعام عرف ثلاثة(): عدد { أرجع واحد() + 2; }\n@@test\nعرف three(): فراغ { تأكد(ثلاثة() == 3); }\n' > "$W/libs/util/src/lib.sn"
+[[ $HAS_TEST == 1 ]] && printf 'استورد math.lib;\nاستورد المكتبة.تصحيح.تأكد;\nعام عرف ثلاثة(): عدد { أرجع واحد() + 2; }\n@@test\nعرف three(): فراغ { تأكد(ثلاثة() == 3); }\n' > "$W/libs/util/src/lib.sn"
 printf 'استورد util.lib;\n' > "$W/libs/util/src/util.sn"
 printf '[package]\nname = "math"\nversion = "0.1.0"\n\n[lib]\npath = "src"\n' > "$W/libs/math/Supax.toml"
 printf 'عام عرف واحد(): عدد { أرجع 1; }\n' > "$W/libs/math/src/lib.sn"
@@ -738,6 +780,156 @@ wait "$a"; ra=$?; wait "$b"; rb=$?
     && ok "no temporary folders are left in the cache" || bad "leftover temp folders"
 expect_ok "cache clean removes the git cache" bash -c "'$SX' cache clean && [ -z \"\$(ls -A '$SUPAX_HOME/git/checkouts' 2>/dev/null)\" ] && [ ! -e '$SUPAX_HOME/git/db' ]"
 (cd "$WORK/gitbuild" && "$SX" run >/dev/null 2>&1); [[ $? == 42 ]] && ok "after cache clean, a build fetches again" || bad "refetch after clean"
+
+# --- new --lib ----------------------------------------------------------------------
+L="$WORK/newlib"; mkdir -p "$L"
+(cd "$L" && "$SX" new مكتبتي --lib >/dev/null 2>&1 && SUPAX_LANG=en "$SX" new enlib --lib >/dev/null 2>&1)
+grep -q '^\[lib\]' "$L/مكتبتي/Supax.toml" && [[ -f "$L/مكتبتي/src/مكتبتي.sn" && -f "$L/مكتبتي/src/lib.sn" && ! -e "$L/مكتبتي/src/main.sn" ]] \
+    && ok "new --lib writes [lib], the root file and src/lib.sn, and no main.sn" || bad "new --lib files" "$(ls -R "$L/مكتبتي")"
+grep -q 'استورد مكتبتي.lib;' "$L/مكتبتي/src/مكتبتي.sn" && grep -q 'import std.debug.assert;' "$L/enlib/src/lib.sn" \
+    && ok "new --lib follows the message language" || bad "new --lib language"
+"$SULTANC" fmt --check "$L/مكتبتي/src" "$L/enlib/src" >/dev/null 2>&1 && ok "the --lib template is formatted" || bad "new --lib format"
+mkdir -p "$L/initlib"; (cd "$L/initlib" && "$SX" init --lib >/dev/null 2>&1)
+[[ -f "$L/initlib/src/initlib.sn" && -f "$L/initlib/src/lib.sn" ]] && ok "init --lib makes a library in the current directory" || bad "init --lib"
+if [[ $HAS_TEST == 1 ]]; then
+    out="$(cd "$L/enlib" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
+    [[ $code == 0 && "$out" == *"PASS adds_two_numbers"* ]] && ok "the new library's test passes" || bad "new --lib test ($code)" "$out"
+    expect_ok "the new library checks" bash -c "cd '$L/enlib' && '$SX' check"
+else
+    ok "the new library's test passes (skipped: no sultanc test)"; ok "the new library checks (skipped)"
+fi
+
+# --- [dev-dependencies] ---------------------------------------------------------------
+D="$WORK/dev"; mkdir -p "$D"
+(cd "$D" && SUPAX_LANG=en "$SX" new helper --lib >/dev/null 2>&1 && SUPAX_LANG=en "$SX" new other --lib >/dev/null 2>&1 \
+    && SUPAX_LANG=en "$SX" new mylib --lib >/dev/null 2>&1)
+printf 'public def seven(): int {\n    return 7;\n}\n' > "$D/helper/src/lib.sn"
+printf 'public def eight(): int {\n    return 8;\n}\n' > "$D/other/src/lib.sn"
+out="$(cd "$D/mylib" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" add helper --path ../helper --dev 2>&1)"
+grep -q '^\[dev-dependencies\]' "$D/mylib/Supax.toml" && grep -A1 '^\[dev-dependencies\]' "$D/mylib/Supax.toml" | grep -q '^helper = ' \
+    && [[ "$out" == *"to [dev-dependencies]"* ]] && ok "add --dev writes [dev-dependencies]" || bad "add --dev" "$out$(cat "$D/mylib/Supax.toml")"
+(cd "$D/mylib" && "$SX" add other --path ../other >/dev/null 2>&1)
+grep -q 'name = "helper"' "$D/mylib/Supax.lock" && ok "Supax.lock includes dev-dependencies" || bad "lock dev"
+(cd "$D/mylib" && "$SX" metadata --output=g.toml >/dev/null 2>&1)
+! grep -q helper "$D/mylib/g.toml" && grep -q 'to = "other"' "$D/mylib/g.toml" \
+    && ok "the build graph (metadata) leaves dev-dependencies out" || bad "metadata dev" "$(cat "$D/mylib/g.toml")"
+out="$(cd "$D/mylib" && SUPAX_LANG=en "$SX" tree 2>&1)"
+[[ "$out" == *"[dev-dependencies]"*"helper"* && "$out" == *"other"* ]] && ok "tree shows dev-dependencies under their own heading" || bad "tree dev" "$out"
+if [[ $HAS_TEST == 1 ]]; then
+    mkdir -p "$D/mylib/tests"
+    printf 'import std.debug.assert;\nimport mylib.lib;\nimport helper.lib;\nimport other.lib;\n\n@@test\ndef uses_both(): void {\n    assert(add(seven(), eight()) == 15);\n}\n' > "$D/mylib/tests/it.sn"
+    out="$(cd "$D/mylib" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
+    [[ $code == 0 && "$out" == *"PASS adds_two_numbers"* && "$out" == *"PASS uses_both"* ]] \
+        && ok "tests/ can import dev-dependencies and dependencies" || bad "tests/ dev ($code)" "$out"
+    cp "$D/mylib/src/lib.sn" "$D/lib.sn.bak"; printf 'import helper.lib;\n' >> "$D/mylib/src/lib.sn"
+    out="$(cd "$D/mylib" && SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
+    [[ $code != 0 && "$out" == *"SULTANC-MODULE-NOT-FOUND"* ]] && ok "a file in src/ cannot import a dev-dependency" || bad "src dev import ($code)" "$out"
+    cp "$D/lib.sn.bak" "$D/mylib/src/lib.sn"
+    (cd "$D" && SUPAX_LANG=en "$SX" new binapp >/dev/null 2>&1); (cd "$D/binapp" && "$SX" add helper --path ../helper --dev >/dev/null 2>&1)
+    mkdir -p "$D/binapp/tests"; printf 'import std.debug.assert;\nimport helper.lib;\n\n@@test\ndef bin_side(): void {\n    assert(seven() == 7);\n}\n' > "$D/binapp/tests/t.sn"
+    out="$(cd "$D/binapp" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" test 2>&1)"; code=$?
+    [[ $code == 0 && "$out" == *"PASS bin_side"* ]] && ok "a package without [lib]: tests/ can import dev-dependencies" || bad "bin tests/ dev ($code)" "$out"
+else
+    for n in 1 2 3; do ok "dev-dependencies in tests (skipped: no sultanc test)"; done
+fi
+expect_ok "build works without the dev-dependencies" bash -c "cd '$D/mylib' && '$SX' build"
+(cd "$D" && SUPAX_LANG=en "$SX" new user >/dev/null 2>&1); (cd "$D/user" && "$SX" add mylib --path ../mylib >/dev/null 2>&1)
+! grep -q helper "$D/user/Supax.lock" && ok "a dependency's dev-dependencies are not resolved" || bad "transitive dev" "$(cat "$D/user/Supax.lock")"
+cp "$D/mylib/Supax.toml" "$D/toml.bak"
+awk '{ print } $0 == "[dependencies]" { print "helper = { path = \"../helper\" }" }' "$D/toml.bak" > "$D/mylib/Supax.toml"
+expect_fail "the same key in [dependencies] and [dev-dependencies] is an error" "in both [dependencies] and [dev-dependencies]" \
+    bash -c "cd '$D/mylib' && SUPAX_LANG=en '$SX' check"
+cp "$D/toml.bak" "$D/mylib/Supax.toml"
+expect_fail "remove without --dev looks only in [dependencies]" 'no dependency named "helper" in [dependencies]' \
+    bash -c "cd '$D/mylib' && SUPAX_LANG=en '$SX' remove helper"
+expect_ok "remove --dev removes a dev-dependency" bash -c "cd '$D/mylib' && '$SX' remove helper --dev && ! grep -q '^helper' Supax.toml"
+
+# --- program file names per target, and running another target's program -------------
+G="$WORK/tnames"; mkdir -p "$G"; (cd "$G" && SUPAX_LANG=en "$SX" new app >/dev/null 2>&1)
+(cd "$G/app" && "$SX" build --target wasm32-wasi >/dev/null 2>&1)
+[[ -f "$G/app/build/bin/wasm32-wasi/app.wasm" ]] && ok "a wasm32-wasi build is written as <name>.wasm" || bad "wasm name" "$(ls -R "$G/app/build/bin" 2>&1)"
+expect_fail "run for a target this machine cannot run says so" "it was built for the target wasm32-wasi" \
+    bash -c "cd '$G/app' && SUPAX_LANG=en '$SX' run --target wasm32-wasi"
+
+# --- fmt ----------------------------------------------------------------------------
+F="$WORK/fmt"; mkdir -p "$F"; (cd "$F" && SUPAX_LANG=en "$SX" new app >/dev/null 2>&1)
+mkdir -p "$F/app/tests"
+printf 'def main(): int {\nreturn 0;\n}\n' > "$F/app/src/main.sn"
+printf 'def helper(): int {\nreturn 1;\n}\n' > "$F/app/tests/t.sn"
+out="$(cd "$F/app" && SUPAX_LANG=en "$SX" fmt --check 2>&1)"; code=$?
+[[ $code == 1 && "$out" == *"src/main.sn"* && "$out" == *"tests/t.sn"* ]] && ok "fmt --check reports unformatted files in src/ and tests/, exit 1" || bad "fmt --check ($code)" "$out"
+(cd "$F/app" && "$SX" fmt >/dev/null 2>&1) && grep -q '^    return 0;' "$F/app/src/main.sn" && grep -q '^    return 1;' "$F/app/tests/t.sn" \
+    && ok "fmt formats src/ and tests/" || bad "fmt" "$(cat "$F/app/src/main.sn")"
+expect_ok "fmt --check passes once formatted" bash -c "cd '$F/app' && '$SX' fmt --check"
+mkdir -p "$F/ws/a/src" "$F/ws/b/src"
+printf '[workspace]\nmembers = ["a", "b"]\n' > "$F/ws/Supax.toml"
+for m in a b; do printf '[package]\nname = "%s"\nversion = "0.1.0"\n' "$m" > "$F/ws/$m/Supax.toml"; printf 'def main(): int {\nreturn 0;\n}\n' > "$F/ws/$m/src/main.sn"; done
+(cd "$F/ws" && "$SX" fmt >/dev/null 2>&1)
+grep -q '^    return 0;' "$F/ws/a/src/main.sn" && grep -q '^    return 0;' "$F/ws/b/src/main.sn" && ok "fmt at a workspace root formats every member" || bad "fmt workspace"
+
+# --- --message-format and --color ------------------------------------------------------
+M="$WORK/msgfmt"; mkdir -p "$M"; (cd "$M" && SUPAX_LANG=en "$SX" new app >/dev/null 2>&1)
+printf 'def main(): int {\n    return "x";\n}\n' > "$M/app/src/main.sn"
+out="$(cd "$M/app" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" check --message-format=json 2>&1)"; code=$?
+[[ $code != 0 && "$out" == '{"schema"'* && "$out" == *'"id":"SULTANC-TYPE-RETURN-MISMATCH"'* && "$out" != *"Checking"* ]] \
+    && ok "--message-format=json gives the compiler's JSON and no status lines" || bad "json ($code)" "$out"
+out="$(cd "$M/app" && SUPAX_LANG=en "$SX" check --message-format short 2>&1)"
+[[ "$out" == *"src/main.sn:2:"*"error[SULTANC-TYPE-RETURN-MISMATCH]"* ]] && ok "--message-format short (space form) gives one line per diagnostic" || bad "short" "$out"
+out="$(cd "$M/app" && "$SX" check --color=always 2>&1)"; [[ "$out" == *$'\e['* ]] && ok "--color=always colors the diagnostics" || bad "color always"
+out="$(cd "$M/app" && "$SX" check --color=never 2>&1)"; [[ "$out" != *$'\e['* ]] && ok "--color=never does not" || bad "color never"
+expect_fail "--message-format checks its value" "human | short | json" bash -c "cd '$M/app' && SUPAX_LANG=en '$SX' check --message-format=xml"
+expect_fail "--color checks its value" "auto | always | never" bash -c "cd '$M/app' && SUPAX_LANG=en '$SX' check --color=sometimes"
+if [[ $HAS_TEST == 1 ]]; then
+    out="$(cd "$M/app" && SUPAX_LANG=en "$SX" test --message-format=json 2>&1)"
+    [[ "$out" == *'"id":"SULTANC-TYPE-RETURN-MISMATCH"'* ]] && ok "test passes --message-format to sultanc test" || bad "test json" "$out"
+else
+    ok "test passes --message-format (skipped: no sultanc test)"
+fi
+printf 'import std.process.argument_count;\n\ndef main(): int {\n    return argument_count() as int;\n}\n' > "$M/app/src/main.sn"
+(cd "$M/app" && "$SX" run -- --color=never --quiet >/dev/null 2>&1); [[ $? == 3 ]] \
+    && ok "options after -- go to the program, not to Supax" || bad "args after --"
+
+# --- install and uninstall ---------------------------------------------------------------
+I="$WORK/inst"; mkdir -p "$I"; B="$SUPAX_HOME/bin"
+(cd "$I" && SUPAX_LANG=en "$SX" new greet >/dev/null 2>&1)
+mkdir -p "$I/greet/src/bin"
+printf 'عرف الرئيسية(): عدد { أرجع 5; }\n' > "$I/greet/src/main.sn"
+printf 'عرف الرئيسية(): عدد { أرجع 6; }\n' > "$I/greet/src/bin/second.sn"
+out="$(SUPAX_QUIET=0 SUPAX_LANG=en "$SX" install --path "$I/greet" 2>&1)"; code=$?
+"$B/greet"; r1=$?; "$B/second"; r2=$?
+[[ $code == 0 && $r1 == 5 && $r2 == 6 && "$out" == *"[release]"* && "$out" == *"Installed greet v0.1.0"* ]] \
+    && ok "install --path builds with --release and installs every program" || bad "install --path ($code $r1 $r2)" "$out"
+grep -q 'package = "greet"' "$SUPAX_HOME/installed.toml" && grep -q 'source = "path"' "$SUPAX_HOME/installed.toml" \
+    && ok "installed.toml records the programs and their package" || bad "installed.toml" "$(cat "$SUPAX_HOME/installed.toml" 2>&1)"
+out="$(SUPAX_LANG=en "$SX" install --list 2>&1)"
+[[ "$out" == *"greet v0.1.0"* && "$out" == *"second"* ]] && ok "install --list shows packages and programs" || bad "install --list" "$out"
+out="$(SUPAX_QUIET=0 SUPAX_LANG=en "$SX" install --path "$I/greet" 2>&1)"
+[[ "$out" == *"Replacing"* ]] && ok "reinstalling a package replaces its programs" || bad "reinstall" "$out"
+(cd "$I" && SUPAX_LANG=en "$SX" new other >/dev/null 2>&1); mkdir -p "$I/other/src/bin"; cp "$I/greet/src/bin/second.sn" "$I/other/src/bin/"
+expect_fail "another package's program is not replaced without --force" 'was installed by the package "greet"' \
+    bash -c "SUPAX_LANG=en '$SX' install --path '$I/other'"
+expect_ok "--force replaces it" bash -c "'$SX' install --path '$I/other' --force && grep -A2 'name = \"second\"' '$SUPAX_HOME/installed.toml' | grep -q 'package = \"other\"'"
+printf '#!/bin/sh\n' > "$B/foreign"; (cd "$I" && SUPAX_LANG=en "$SX" new foreign >/dev/null 2>&1)
+expect_fail "a file Supax did not install is not replaced" "was not installed by Supax" bash -c "SUPAX_LANG=en '$SX' install --path '$I/foreign'"
+(cd "$I" && SUPAX_LANG=en "$SX" new alib --lib >/dev/null 2>&1)
+expect_fail "a library has nothing to install" "has no programs" bash -c "SUPAX_LANG=en '$SX' install --path '$I/alib'"
+(cd "$I" && SUPAX_LANG=en "$SX" new supax >/dev/null 2>&1)
+expect_fail "a program named supax is refused" "belongs to Supax and the compiler" bash -c "SUPAX_LANG=en '$SX' install --path '$I/supax'"
+expect_fail "install --target is refused" "builds for this machine" bash -c "SUPAX_LANG=en '$SX' install --path '$I/greet' --target wasm32-wasi"
+mkdir -p "$I/gtool"; (cd "$I/gtool" && SUPAX_LANG=en "$SX" init gtool >/dev/null 2>&1 && SUPAX_LANG=en "$SX" new glib --lib >/dev/null 2>&1 && "$SX" add glib --path glib >/dev/null 2>&1)
+printf 'import glib.lib;\n\ndef main(): int {\n    return add(40, 2);\n}\n' > "$I/gtool/src/main.sn"
+(cd "$I/gtool" && git_q init -q && git_q add -A && git_q commit -qm init && git_q tag v1)
+out="$(SUPAX_LANG=en "$SX" install --git "file://$I/gtool" --tag v1 2>&1)"; code=$?
+"$B/gtool"; rc=$?
+[[ $code == 0 && $rc == 42 ]] && grep -q 'source = "git"' "$SUPAX_HOME/installed.toml" \
+    && ok "install --git (name from the URL) builds the repository, with its path dependencies" || bad "install --git ($code $rc)" "$out"
+[[ -z "$(ls -A "$SUPAX_HOME/tmp" 2>/dev/null)" ]] && ok "install removes its temporary folder" || bad "install tmp" "$(ls -A "$SUPAX_HOME/tmp")"
+expect_ok "a second install from git uses the cache, which still matches its checksum" bash -c "'$SX' install --git 'file://$I/gtool' --tag v1 --offline"
+expect_fail "uninstall --bin names one program of the package" 'did not install a program named "nope"' \
+    bash -c "SUPAX_LANG=en '$SX' uninstall greet --bin nope"
+expect_ok "uninstall removes the package's programs" bash -c "'$SX' uninstall greet && [ ! -e '$B/greet' ] && ! grep -q 'package = \"greet\"' '$SUPAX_HOME/installed.toml'"
+[[ -e "$B/second" ]] && ok "uninstall leaves other packages' programs" || bad "uninstall others"
+expect_fail "uninstalling a package that is not installed is an error" 'is not installed' bash -c "SUPAX_LANG=en '$SX' uninstall greet"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 rm -rf "$WORK"
