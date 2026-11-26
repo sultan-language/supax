@@ -52,6 +52,49 @@ sultanc --package-graph=bootstrap/package-graph.toml src/main.sn -o build/supax
 
 Supax detects the contract by running `sultanc --package-graph` with no value: an older compiler answers `SULTANC-CLI-UNKNOWN-OPTION` (the code is the same in every language), and then Supax falls back to the previous contract below, where the compiler reads `Supax.toml` and git dependencies go through `--dependency-map`.
 
+### SultanC 2026-11-16: the standard library in three layers
+
+The snapshot `SultanC_20261116_static_env_core_moves` splits the standard library into `core`, `alloc` and `std` (`docs/en/reference/std-layers.md` in the compiler). std re-exports the moved modules, so every path Supax imported still resolved; nothing in the package graph changed.
+
+Supax follows the compiler's own convention from this snapshot: Arabic sources import the standard library with its Arabic spellings throughout (`المكتبة.نصوص.من_بايتات`, not `المكتبة.نصوص.from_bytes`). The spellings come from the library's root files, so older compilers, which lack some of them, can no longer build Supax: this snapshot is the minimum. The template of `supax new` imports `المكتبة.دخ.اطبع_سطر` in Arabic and `std.io.println` in English.
+
+Both installers copy the whole `library/` folder, so `core` and `alloc` are installed beside `std` with no change.
+
+Verified on this snapshot (built with `./build.sh --bootstrap=wasm`; the previous compiler cannot build it):
+
+- `tests/run.sh`: 156/156.
+- Supax builds itself (`build/bin/supax build`).
+- `tools/install.sh` into an empty home, then `supax new` and `supax run` in Arabic and in English.
+- `supax add nahr@0.1.0-dev` from the index, then building Nahr's Arabic example and serving a request from it.
+
+### The Arabic comma (SultanC `SultanC_main_20261125_patterns`)
+
+`sultanc fmt` now writes `،` (U+060C) between list items in an Arabic source and `,` in an English one; both compile. Supax's sources were reformatted with it, and the Arabic `supax new --lib` template writes `اجمع(الأول: عدد، الثاني: عدد)`, so a new library is formatted from the start. `final8` and older compilers reject `،` (`SULTANC-LEX-INVALID-TOKEN`), so Supax now needs this checkpoint or newer. `tests/run.sh` passes 218/218 on it.
+
+The compiler no longer has `--release`, and without `-O` it optimizes nothing ("a package manager's build profile chooses a level and passes it as `-O`"). `supax build|run|test|install --release` now pass `-O3`, as Cargo's release profile (`opt-level = 3`); a normal build passes no `-O` (`-O0`), as Cargo's dev profile.
+
+The checkpoint also adds a compilation cache (`compiler/driver/compile_cache.sn`): `sultanc` stores each compilation's output under the identity of the compiler, the request (the package graph by content included) and every source it read, in `SULTANC_CACHE` or the user cache directory; `--no-cache` skips it. Supax passes nothing for it and needs no change: a changed dependency changes the sources or the graph, so a stale output cannot be reused.
+
+### `ليكن` replaces `دع` (SultanC `SultanC_main_20261123_final8`)
+
+Since this checkpoint the binding keyword is `ليكن`, and `دع` has no deprecated alias: the compiler rejects it. Supax's Arabic sources and docs were rewritten with the compiler's lexer-based tool, `tools/rename/rename_tokens.py --wave 8` (`دع` → `ليكن`): 1269 keyword tokens; strings, comments and longer identifiers were left alone. The tool skips folders named `build`, so `src/build/*.sn` was passed by file. Supax therefore needs `final8` or newer; on `final2` it stops with `SULTANC-PARSE-SYNTAX` at the first `ليكن`. Apart from the rename, the compiler's command line, package graph and std location are unchanged. The D1 row below keeps `دع`, as it was reported.
+
+### SultanC 2026-11-19 (`SultanC_main_20261119_interp1_ci`)
+
+Nothing in the contract changed: the package graph, `sultanc test` and its options, and the std paths Supax imports are the same. `tests/run.sh` passes 217/217. Supax changes in this round, all on its own side:
+
+| Change | Compiler side |
+|---|---|
+| `[dev-dependencies]` | None. They are resolved and locked like other dependencies; their edges are left out of `package-graph.toml` and written only to the graphs `supax test` passes: `test-graph.toml` (a package with `[lib]`; the `tests` package also gets an edge to each of the root's dependencies) and `dev-graph.toml` (a package without `[lib]`). Programs and the library are tested with the build graph, so a file in `src/` cannot import a dev-dependency |
+| `supax new --lib` | None |
+| `<name>.wasm` for WebAssembly targets | None: Supax passes the name with `-o` |
+| `supax fmt [--check]` | `sultanc fmt [--check] <paths>`: `src/`, `tests/`, a root `main.sn`, the `[lib]` folder if outside `src/`. Status 1 from `--check` is passed on |
+| `--message-format`, `--color` | Passed as `--diagnostic-format=<human\|short\|json>` and `--color=<auto\|always\|never>` to `check`, builds, `test` and `fmt`. The compiler writes JSON to standard error, where Supax's status lines also go, so `json` turns those lines off |
+| `supax publish`, `yank` | None: both work on the git index. `publish` uploads nothing until the registry website exists |
+| `supax install`, `uninstall` | None: a normal `--release` build, then Supax copies the programs. A git or index package is resolved with the `[lib]` requirement lifted for that one package |
+
+The compiler now names the missing module in `SULTANC-MODULE-NOT-FOUND`, for example: The missing source module is `helper.lib`.
+
 ### Verified with SultanC `7b00d69`
 
 - Supax builds from `bootstrap/package-graph.toml`, then rebuilds itself through `--package-graph`.
@@ -77,7 +120,7 @@ Supax runs `sultanc test --lang=<ar|en> --package-graph=<graph> [--filter=<text>
 |---|---|
 | Reserved words in the graph | Rejected by the compiler at the field's line |
 | `--package-graph` in `sultanc --help` | Fixed on branch supax-round (`02867f8`) |
-| `std.time` Arabic spelling | Fixed in `02867f8` (`المكتبة.وقت`). Supax keeps `المكتبة.time.time` until that commit is in a release, since both work |
+| `std.time` Arabic spelling | Fixed in `02867f8` (`المكتبة.وقت`); Supax uses it since the 2026-11-16 snapshot |
 | D2 keyword as a record field name | Fixed on master |
 | D5 byte offsets | Fixed on master: `file:line:column` |
 | `sultanc test` | Done in `3b441bc`; `supax test` uses it (below) |
@@ -95,7 +138,7 @@ Programs are written to `build/bin/<name>`, so a package named `supax` does not 
 | R2 `--dependency-map` | Done |
 | R3 diagnostics (`SULTANC-PACKAGE-GIT-DEPENDENCY-UNRESOLVED`, `SULTANC-PACKAGE-DEPENDENCY-MAP-INVALID`, git field checks) | Done, Arabic and English |
 | D1 `&` on a top-level `نص` constant | Fixed |
-| D2 keyword (`من`, `إلى`) as a record field name | **Open**: still `SULTANC-ICE-PARSER-NO-RESULT` with no location |
+| D2 keyword (`من`, `إلى`) as a record field name | Fixed: now `SULTANC-PARSE-SYNTAX` at the field, with its location (checked on the 2026-11-19 snapshot). A keyword is still not a field name |
 | D3 compiling from inside `src/` | Fixed |
 | D4 Arabic names for `process`, `env`, `crypto`, `toml`, `collections`, `version` | Done; Supax now imports `المكتبة.عمليات`, `المكتبة.بيئة` and the others |
 | D5 manifest and map diagnostics report a byte offset (`byte 117`) | **Open, minor**: a line and column would be easier to read |

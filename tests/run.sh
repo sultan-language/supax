@@ -352,8 +352,10 @@ out="$(cd "$WORK/edit/shop" && SUPAX_QUIET=0 SUPAX_LANG=en "$SX" run 2>&1)"; cod
 out="$(cd "$WORK/edit/shop" && SUPAX_QUIET=0 "$SX" -q build 2>&1)"
 [[ -z "$out" ]] && ok "--quiet hides the status lines" || bad "quiet" "$out"
 (cd "$WORK/edit/shop" && SULTANC="$WORK/fakecc/sultanc" "$SX" build --release --target some-target >/dev/null 2>&1)
-grep -qx -- "--release" "$WORK/fakecc/args" && grep -qx -- "some-target" "$WORK/fakecc/args" && grep -q "build/bin/some-target/shop" "$WORK/fakecc/args" \
-    && ok "--release and --target reach the compiler; output goes to build/bin/<target>/" || bad "build options" "$(cat "$WORK/fakecc/args")"
+grep -qx -- "-O3" "$WORK/fakecc/args" && ! grep -qx -- "--release" "$WORK/fakecc/args" && grep -qx -- "some-target" "$WORK/fakecc/args" && grep -q "build/bin/some-target/shop" "$WORK/fakecc/args" \
+    && ok "--release reaches the compiler as -O3, --target as given; output goes to build/bin/<target>/" || bad "build options" "$(cat "$WORK/fakecc/args")"
+(cd "$WORK/edit/shop" && SULTANC="$WORK/fakecc/sultanc" "$SX" build >/dev/null 2>&1)
+! grep -q -- "^-O" "$WORK/fakecc/args" && ok "a normal build passes no -O (the compiler's -O0)" || bad "dev -O" "$(cat "$WORK/fakecc/args")"
 expect_ok "clean removes build/" bash -c "cd '$WORK/edit/shop' && '$SX' clean && [ ! -e build ]"
 
 # --- manifest rules Supax now enforces for the compiler -------------------------

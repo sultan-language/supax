@@ -3,5 +3,5 @@ version = 1
 
 [[package]]
 name = "supax"
-version = "0.1.0-dev"
+version = "0.1.2"
 source = "root"

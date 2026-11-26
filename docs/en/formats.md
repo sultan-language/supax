@@ -27,6 +27,7 @@ Rules:
 - The dependency key must equal the package's `[package].name` or one of its `[package.names]` spellings. This applies to git dependencies.
 - Every dependency must declare `[lib]`.
 - One commit per repository in the whole graph. Two requests that reach different commits are a conflict.
+- `[dev-dependencies]` takes the same entries and rules. Its packages are for `tests/` only; see the [guide](guide.md#dev-dependencies).
 - `[package].build` is refused, because Supax never runs package code.
 - One version per compatible range of an index package (`1.x`, `0.3.x`, `0.0.4`), as in Cargo: `1.x` for one importer and `2.x` for another live side by side. Two requirements in the same range with no common version are a conflict.
 
@@ -86,7 +87,11 @@ Supax checks the fetched content against `checksum`, and the `version` in that c
 
 ### Adding a version
 
-`supax package` (run in the package's repository) prints the file path and the `[[versions]]` entry for `HEAD`, with the checksum computed exactly as a fetch computes it. Push the commit, then add the entry to that file in the index repository.
+`supax package` (run in the package's repository) prints the file path and the `[[versions]]` entry for `HEAD`, with the checksum computed exactly as a fetch computes it. Push the commit, then add the entry to that file in the index repository. `supax publish` runs the same checks and prints these steps; it uploads nothing until the package registry website exists, and will be reworked then.
+
+### Yanking a version
+
+`supax yank <name>@<version>` adds `yanked = true` to that version's entry in a local clone of the index (`--index <dir>`, or the current directory), and `--undo` removes it; nothing else in the file changes. Commit the change and open a pull request to the index. A yanked version is never picked for a new lock, but a `Supax.lock` that already pins it keeps working.
 
 ## `Supax.lock`
 

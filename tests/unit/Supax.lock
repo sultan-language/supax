@@ -9,6 +9,6 @@ dependencies = ["supax"]
 
 [[package]]
 name = "supax"
-version = "0.1.0-dev"
+version = "0.1.2"
 source = "path"
 path = "../.."
